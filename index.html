@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Quest Pro">
+<meta name="theme-color" content="#080808">
+<link rel="manifest" id="pwaManifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -185,11 +187,48 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .badge-green{background:rgba(16,185,129,.15);color:var(--green);}
 
 @media(max-width:360px){.muscle-grid{grid-template-columns:repeat(2,1fr);}.shop-grid,.inv-grid{grid-template-columns:1fr;}}
+
+/* MODAL EDITAR MISSÃO */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:flex-end;justify-content:center;padding:0;}
+.modal-sheet{background:var(--bg1);border-radius:20px 20px 0 0;border:1px solid var(--border2);width:100%;max-width:600px;padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto;animation:slideUp .25s ease;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.modal-handle{width:40px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 16px;}
+
+/* NOTIF CARD */
+.notif-settings{background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);border-radius:var(--r);padding:14px;margin-bottom:11px;}
+
 </style>
 </head>
 <body>
 
 <div class="notif-wrap" id="notifWrap"></div>
+
+<!-- MODAL EDITAR MISSÃO -->
+<div class="modal-overlay" id="editMissionModal" style="display:none" onclick="if(event.target===this)closeEditModal()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div style="font-size:14px;font-weight:800;color:var(--gold);margin-bottom:14px">✏️ Editar Missão</div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div style="width:70px"><label class="field-label">Emoji</label><input class="field-input" id="em-icon" placeholder="📌" maxlength="4"></div>
+      <div style="flex:1"><label class="field-label">Nome</label><input class="field-input" id="em-name" placeholder="Nome da missão"></div>
+    </div>
+    <div class="form-row">
+      <div><label class="field-label">🪙 Recompensa</label><input class="field-input" id="em-coins" type="number" min="1"></div>
+      <div><label class="field-label">❌ Penalidade</label><input class="field-input" id="em-pen" type="number" min="0"></div>
+    </div>
+    <label class="field-label">Dias obrigatórios</label>
+    <div class="day-pills" id="em-days" style="margin-bottom:14px">
+      <span class="day-pill" data-d="0">Dom</span><span class="day-pill" data-d="1">Seg</span>
+      <span class="day-pill" data-d="2">Ter</span><span class="day-pill" data-d="3">Qua</span>
+      <span class="day-pill" data-d="4">Qui</span><span class="day-pill" data-d="5">Sex</span>
+      <span class="day-pill" data-d="6">Sáb</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-gold" style="flex:1" onclick="saveEditMission()">✓ Salvar</button>
+      <button class="btn btn-ghost" onclick="closeEditModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
 <div class="levelup" id="lvlOverlay">
   <div class="levelup-big" id="lvlText">LEVEL UP! 👑</div>
   <div style="font-size:15px;color:var(--text2);font-weight:600" id="lvlSub">Você avançou!</div>
@@ -245,14 +284,42 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
     </div>
 
     <!-- ÁGUA -->
-    <div class="water-card">
-      <div class="water-title">💧 Hidratação — 6 copos = 3L</div>
-      <div class="water-cups" id="waterCups">
-        <span class="water-cup" onclick="toggleWater(0)">🥛</span><span class="water-cup" onclick="toggleWater(1)">🥛</span>
-        <span class="water-cup" onclick="toggleWater(2)">🥛</span><span class="water-cup" onclick="toggleWater(3)">🥛</span>
-        <span class="water-cup" onclick="toggleWater(4)">🥛</span><span class="water-cup" onclick="toggleWater(5)">🥛</span>
+    <div class="water-card" id="waterCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="water-title" style="margin-bottom:0" id="waterTitle">💧 Hidratação</div>
+        <button class="btn btn-ghost btn-sm" onclick="tog('waterEditForm')" style="font-size:10px">⚙️ Editar</button>
       </div>
-      <div style="font-weight:700;font-size:13px"><span id="waterCount">0</span>/6 copos &nbsp;·&nbsp; <span style="color:var(--text3);font-size:10px">Reseta a cada 10h</span></div>
+      <div class="water-cups" id="waterCups"></div>
+      <div style="font-weight:700;font-size:13px"><span id="waterCount">0</span>/<span id="waterTotal">6</span> &nbsp;·&nbsp; <span id="waterMl" style="color:var(--text3);font-size:10px"></span> &nbsp;·&nbsp; <span style="color:var(--text3);font-size:10px">Reseta a cada 10h</span></div>
+    </div>
+
+    <!-- FORM EDITAR ÁGUA -->
+    <div class="form-card collapse" id="waterEditForm">
+      <div style="font-size:13px;font-weight:800;margin-bottom:12px;color:var(--blue)">💧 Configurar Hidratação</div>
+      <div class="form-row">
+        <div><label class="field-label">Nº de copos/garrafas</label><input class="field-input" id="wc-count" type="number" placeholder="6" min="1" max="20"></div>
+        <div><label class="field-label">ml por unidade</label><input class="field-input" id="wc-ml" type="number" placeholder="500" min="50"></div>
+      </div>
+      <label class="field-label">Ícone</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-ghost" id="wc-btn-cup" onclick="selectWaterIcon('cup')" style="font-size:20px;flex:1">🥛 Copo</button>
+        <button class="btn btn-ghost" id="wc-btn-bottle" onclick="selectWaterIcon('bottle')" style="font-size:20px;flex:1">🍶 Garrafa</button>
+        <button class="btn btn-ghost" id="wc-btn-drop" onclick="selectWaterIcon('drop')" style="font-size:20px;flex:1">💧 Gota</button>
+      </div>
+      <button class="btn btn-blue btn-full" onclick="saveWaterSettings()">✓ Salvar</button>
+    </div>
+
+    <!-- NOTIFICAÇÕES -->
+    <div class="notif-settings">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa">🔔 Notificações</div>
+        <span id="notifStatusBadge" style="font-size:10px;color:var(--text3)">Desativado</span>
+      </div>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Receba um lembrete diário para completar suas missões.</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="time" class="field-input" id="notifTimeInput" style="flex:1;margin-bottom:0" value="08:00">
+        <button class="btn" id="notifToggleBtn" style="background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3);white-space:nowrap" onclick="toggleNotifications()">🔔 Ativar</button>
+      </div>
     </div>
 
     <!-- MISSÕES -->
@@ -446,6 +513,8 @@ let G = {
   lastWaterReset: Date.now(),
   kaffaFixed: false,
   epicMission: { name:'Kaffa', subtitle:'Fixou o estágio na Kaffa? A missão mais valiosa!', icon:'🎯', coins:10000, completed:false },
+  waterSettings: { count:6, mlPerCup:500, icon:'cup' },
+  notifEnabled: false, notifTime: '08:00',
   waterCups: [false,false,false,false,false,false],
   mainQuests: {
     acordar:   { name:'Acordar Cedo',       icon:'🌅', completed:false, failed:false, coins:30, penalty:200, schedule:[0,1,2,3,4,5,6] },
@@ -483,6 +552,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
   // Setup add-mission day pills
   document.querySelectorAll('#nm-days .day-pill').forEach(p => p.onclick = () => p.classList.toggle('on'));
+  // Reschedule notification if enabled
+  if (G.notifEnabled) scheduleNotification();
 });
 
 // ── NAV ──
@@ -563,14 +634,15 @@ function checkFailed() {
 
 function checkWaterReset() {
   if (Date.now() - G.lastWaterReset > 36000000) {
-    G.waterCups = [false,false,false,false,false,false];
+    const cnt = (G.waterSettings||{}).count || 6;
+    G.waterCups = Array(cnt).fill(false);
     G.lastWaterReset = Date.now();
     saveData(); updateWaterUI();
   }
 }
 
 // ── RENDER ──
-function renderAll() { updateUI(); updateWaterUI(); renderKaffa(); renderMainQuests(); renderCalendar(); }
+function renderAll() { updateUI(); updateWaterUI(); renderKaffa(); renderMainQuests(); renderCalendar(); updateNotifUI(); }
 
 function updateUI() {
   const need = G.level * 100;
@@ -643,19 +715,77 @@ function resetEpicMission() {
 }
 
 // ── WATER ──
+function getWaterIcon() {
+  const icons = { cup:'🥛', bottle:'🍶', drop:'💧' };
+  return icons[(G.waterSettings||{}).icon] || '🥛';
+}
+function buildWaterCups() {
+  const cnt = (G.waterSettings||{}).count || 6;
+  // Resize array if needed
+  while (G.waterCups.length < cnt) G.waterCups.push(false);
+  if (G.waterCups.length > cnt) G.waterCups = G.waterCups.slice(0, cnt);
+}
 function toggleWater(i) {
   G.waterCups[i] = !G.waterCups[i];
   updateWaterUI();
-  if (G.waterCups.filter(Boolean).length===6 && !G.mainQuests.agua.completed) {
+  const ws = G.waterSettings || { count:6 };
+  if (G.waterCups.filter(Boolean).length === ws.count && G.mainQuests.agua && !G.mainQuests.agua.completed) {
     G.mainQuests.agua.completed = true;
-    addCoins(25, 'Meta de água! 💧');
+    const totalMl = ws.count * (ws.mlPerCup || 500);
+    addCoins(25, `Meta de água! ${totalMl}ml 💧`);
     renderMainQuests();
   }
   saveData();
 }
 function updateWaterUI() {
-  document.querySelectorAll('.water-cup').forEach((el,i) => el.classList.toggle('filled', G.waterCups[i]));
-  document.getElementById('waterCount').textContent = G.waterCups.filter(Boolean).length;
+  buildWaterCups();
+  const ws = G.waterSettings || { count:6, mlPerCup:500, icon:'cup' };
+  const icon = getWaterIcon();
+  const cnt = ws.count;
+  const ml = ws.mlPerCup || 500;
+  const totalMl = cnt * ml;
+  const cupsEl = document.getElementById('waterCups');
+  if (cupsEl) {
+    cupsEl.innerHTML = G.waterCups.slice(0,cnt).map((f,i)=>
+      `<span class="water-cup${f?' filled':''}" onclick="toggleWater(${i})">${icon}</span>`
+    ).join('');
+  }
+  const countEl = document.getElementById('waterCount');
+  const totalEl = document.getElementById('waterTotal');
+  const mlEl = document.getElementById('waterMl');
+  const titleEl = document.getElementById('waterTitle');
+  if(countEl) countEl.textContent = G.waterCups.filter(Boolean).length;
+  if(totalEl) totalEl.textContent = cnt;
+  if(mlEl) mlEl.textContent = `${(G.waterCups.filter(Boolean).length * ml / 1000).toFixed(1)}L / ${(totalMl/1000).toFixed(1)}L`;
+  if(titleEl) titleEl.textContent = `💧 Hidratação`;
+}
+let _selectedWaterIcon = null;
+function selectWaterIcon(type) {
+  _selectedWaterIcon = type;
+  ['cup','bottle','drop'].forEach(t => {
+    const btn = document.getElementById('wc-btn-'+t);
+    if(btn) btn.style.borderColor = t===type ? 'var(--blue)' : '';
+    if(btn) btn.style.color = t===type ? 'var(--blue)' : '';
+  });
+}
+function saveWaterSettings() {
+  const count = Math.max(1, Math.min(20, parseInt(document.getElementById('wc-count').value)||6));
+  const mlPerCup = Math.max(50, parseInt(document.getElementById('wc-ml').value)||500);
+  const icon = _selectedWaterIcon || (G.waterSettings||{}).icon || 'cup';
+  G.waterSettings = { count, mlPerCup, icon };
+  // Reset cups to new size
+  G.waterCups = Array(count).fill(false);
+  tog('waterEditForm');
+  updateWaterUI();
+  saveData();
+  notify(`💧 Hidratação atualizada: ${count}x ${mlPerCup}ml`, 'success');
+}
+function openWaterEdit() {
+  const ws = G.waterSettings || { count:6, mlPerCup:500, icon:'cup' };
+  document.getElementById('wc-count').value = ws.count;
+  document.getElementById('wc-ml').value = ws.mlPerCup;
+  selectWaterIcon(ws.icon || 'cup');
+  tog('waterEditForm');
 }
 
 // ── MISSIONS ──
@@ -700,6 +830,7 @@ function renderMainQuests() {
           </div>
           <div class="mission-actions">
             ${btns}
+            <button class="btn btn-ghost btn-sm" style="padding:6px 8px" onclick="openEditMission('${key}')" title="Editar missão">✏️</button>
             <button class="btn btn-ghost btn-sm" style="padding:6px 8px" onclick="removeMission('${key}')" title="Deletar missão">🗑</button>
           </div>
         </div>
@@ -766,7 +897,45 @@ function removeMission(key) {
   }
 }
 
-// ── COURSES ──
+// ── EDITAR MISSÃO ──
+let _editingMissionKey = null;
+function openEditMission(key) {
+  const q = getQ(key);
+  if (!q) return;
+  _editingMissionKey = key;
+  document.getElementById('em-icon').value = q.icon || '';
+  document.getElementById('em-name').value = q.name || '';
+  document.getElementById('em-coins').value = q.coins || 0;
+  document.getElementById('em-pen').value = q.penalty || 0;
+  const sch = q.schedule || [0,1,2,3,4,5,6];
+  document.querySelectorAll('#em-days .day-pill').forEach(p => {
+    const d = parseInt(p.dataset.d);
+    p.classList.toggle('on', sch.includes(d));
+    p.onclick = () => p.classList.toggle('on');
+  });
+  document.getElementById('editMissionModal').style.display = 'flex';
+}
+function closeEditModal() {
+  document.getElementById('editMissionModal').style.display = 'none';
+  _editingMissionKey = null;
+}
+function saveEditMission() {
+  if (!_editingMissionKey) return;
+  const q = getQ(_editingMissionKey);
+  if (!q) return;
+  const name = document.getElementById('em-name').value.trim();
+  if (!name) { notify('Nome não pode ser vazio!', 'error'); return; }
+  q.icon   = document.getElementById('em-icon').value.trim() || q.icon;
+  q.name   = name;
+  q.coins  = parseInt(document.getElementById('em-coins').value) || q.coins;
+  q.penalty= parseInt(document.getElementById('em-pen').value) || 0;
+  const sch = [];
+  document.querySelectorAll('#em-days .day-pill.on').forEach(p => sch.push(parseInt(p.dataset.d)));
+  q.schedule = sch.sort((a,b)=>a-b);
+  closeEditModal();
+  saveData(); renderMainQuests();
+  notify(`✓ "${name}" atualizada!`, 'success');
+}
 function renderCourses() {
   const all=[...G.courses,...(G.customCourses||[])];
   document.getElementById('coursesList').innerHTML = all.map((c,idx)=>{
@@ -1036,27 +1205,113 @@ function loadData() {
     if(p.customMissions)G.customMissions=p.customMissions;
     if(p.customCourses)G.customCourses=p.customCourses;
     if(p.epicMission)G.epicMission=p.epicMission;
-    // Quests: preserve progress + apply default schedules
-    if(p.mainQuests){
-      Object.keys(G.mainQuests).forEach(k=>{
-        if(p.mainQuests[k]){
-          G.mainQuests[k].completed=p.mainQuests[k].completed||false;
-          G.mainQuests[k].failed=p.mainQuests[k].failed||false;
-          G.mainQuests[k].schedule=p.mainQuests[k].schedule||(DS[k]||[0,1,2,3,4,5,6]);
-        }
-      });
-    }
-    // Courses: preserve progress
-    if(p.courses&&Array.isArray(p.courses)){
-      p.courses.forEach(pc=>{
-        const gc=G.courses.find(c=>c.id===pc.id);
-        if(gc){gc.completedLessons=pc.completedLessons||0;gc.currentLesson=pc.currentLesson||1;}
-      });
-    }
+    if(p.waterSettings)G.waterSettings=p.waterSettings;
+    if(p.notifEnabled!==undefined)G.notifEnabled=p.notifEnabled;
+    if(p.notifTime)G.notifTime=p.notifTime;
+    // Quests: carrega direto do salvo (preserva deleções)
+    if(p.mainQuests) G.mainQuests = p.mainQuests;
+    // Courses: carrega direto do salvo (preserva deleções)
+    if(p.courses && Array.isArray(p.courses)) G.courses = p.courses;
   } catch(e){console.error('Load error:',e);}
 }
 
 setInterval(()=>{checkNewDay();checkWaterReset();saveData();},60000);
+
+// ── NOTIFICAÇÕES ──
+function updateNotifUI() {
+  const enabled = G.notifEnabled && Notification.permission === 'granted';
+  const badge = document.getElementById('notifStatusBadge');
+  const btn = document.getElementById('notifToggleBtn');
+  const timeInput = document.getElementById('notifTimeInput');
+  if (badge) badge.textContent = enabled ? '🟢 Ativo' : 'Desativado';
+  if (badge) badge.style.color = enabled ? 'var(--green)' : 'var(--text3)';
+  if (btn) { btn.textContent = enabled ? '🔕 Desativar' : '🔔 Ativar'; }
+  if (timeInput && G.notifTime) timeInput.value = G.notifTime;
+}
+async function toggleNotifications() {
+  if (G.notifEnabled) {
+    G.notifEnabled = false;
+    clearTimeout(window._notifTimeout);
+    saveData(); updateNotifUI();
+    notify('🔕 Notificações desativadas.', '');
+    return;
+  }
+  if (!('Notification' in window)) { notify('Seu navegador não suporta notificações.', 'error'); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    G.notifEnabled = true;
+    G.notifTime = document.getElementById('notifTimeInput')?.value || '08:00';
+    saveData(); updateNotifUI();
+    scheduleNotification();
+    notify('🔔 Notificações ativadas!', 'success');
+  } else {
+    notify('⚠️ Permissão negada. Ative nas configurações do Android.', 'error');
+  }
+}
+function scheduleNotification() {
+  clearTimeout(window._notifTimeout);
+  if (!G.notifEnabled || Notification.permission !== 'granted') return;
+  const [h, m] = (G.notifTime || '08:00').split(':').map(Number);
+  const now = new Date();
+  let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  const delay = target - now;
+  window._notifTimeout = setTimeout(() => {
+    const done = Object.values(G.mainQuests).filter(q=>q.completed).length;
+    const total = Object.values(G.mainQuests).filter(q=>!q.failed).length;
+    try {
+      new Notification('👑 Quest Pro — Modo Coroa', {
+        body: `⚔️ ${done}/${total} missões feitas hoje. Vamos lá!`,
+        icon: 'https://em-content.zobj.net/source/apple/391/crown_1f451.png',
+        badge: 'https://em-content.zobj.net/source/apple/391/crown_1f451.png',
+        tag: 'questpro-daily'
+      });
+    } catch(e){}
+    scheduleNotification();
+  }, Math.min(delay, 2147483647));
+}
+
+// ── PWA SETUP ──
+(function setupPWA() {
+  // Manifest via Blob (works no Android Chrome)
+  try {
+    const manifest = {
+      name: 'Quest Pro — Modo Coroa',
+      short_name: 'Quest Pro',
+      description: 'Seu sistema de missões e recompensas pessoal',
+      start_url: './',
+      scope: './',
+      display: 'standalone',
+      background_color: '#080808',
+      theme_color: '#080808',
+      orientation: 'portrait-primary',
+      icons: [
+        { src:'https://em-content.zobj.net/source/apple/391/crown_1f451.png', sizes:'128x128', type:'image/png', purpose:'any maskable' }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+    const url = URL.createObjectURL(blob);
+    const link = document.getElementById('pwaManifest');
+    if (link) link.href = url;
+  } catch(e) {}
+
+  // Service Worker mínimo (necessário para standalone no Android)
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      const CACHE='questpro-v1';
+      self.addEventListener('install',()=>self.skipWaiting());
+      self.addEventListener('activate',e=>e.waitUntil(clients.claim()));
+      self.addEventListener('fetch',e=>{
+        e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>new Response('',{status:200}))));
+      });
+    `;
+    try {
+      const swBlob = new Blob([swCode], {type:'application/javascript'});
+      const swUrl = URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swUrl).catch(()=>{});
+    } catch(e) {}
+  }
+})();
 </script>
 </body>
 </html>
